@@ -1,6 +1,6 @@
 const DEFAULT_SITES = [
   "facebook.com", "instagram.com", "tiktok.com", "twitter.com", "x.com",
-  "reddit.com", "snapchat.com", "pinterest.com", "tumblr.com", "threads.net",
+  "reddit.com", "snapchat.com", "snapchat.com/web", "pinterest.com", "tumblr.com", "threads.net",
   "discord.com", "discord.gg", "twitch.tv", "youtube.com"
 ];
 
