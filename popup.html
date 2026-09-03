@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FocusFox</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="popup-body">
+  <main class="app-shell">
+    <header class="hero">
+      <div class="brand-mark">F</div>
+      <div><h1>FocusFox</h1><p>Your tiny study sidekick</p></div>
+      <label class="switch" title="Toggle social blocking">
+        <input id="block-toggle" type="checkbox"><span></span>
+      </label>
+    </header>
+
+    <nav class="tabs" aria-label="Helper sections">
+      <button class="tab active" data-tab="helper">Helper</button>
+      <button class="tab" data-tab="tasks">Tasks</button>
+      <button class="tab" data-tab="timer">Timer</button>
+    </nav>
+
+    <section id="helper" class="panel active">
+      <div class="speech"><strong>What are we working on?</strong><br><span>I’ll help you break it down—not just hand you an answer.</span></div>
+      <label for="question">Paste a homework question</label>
+      <textarea id="question" rows="5" placeholder="Example: Solve 3(x + 4) = 27"></textarea>
+      <div class="subject-row">
+        <select id="subject" aria-label="Subject">
+          <option>Math</option><option>Science</option><option>English</option><option>History</option><option>Other</option>
+        </select>
+        <button id="help-btn" class="primary">Help me start</button>
+      </div>
+      <div id="help-output" class="helper-output hidden"></div>
+      <label for="scratchpad">Quick notes</label>
+      <textarea id="scratchpad" rows="3" placeholder="Your ideas, formulas, or reminders…"></textarea>
+    </section>
+
+    <section id="tasks" class="panel">
+      <div class="section-head"><div><h2>Homework list</h2><p>One small win at a time.</p></div><span id="task-count" class="pill">0 left</span></div>
+      <form id="task-form" class="add-row"><input id="task-input" maxlength="100" placeholder="Add an assignment…" required><button class="primary" type="submit">Add</button></form>
+      <ul id="task-list" class="task-list"></ul>
+      <p id="empty-tasks" class="empty">Nothing here yet. Add your first task.</p>
+    </section>
+
+    <section id="timer" class="panel timer-panel">
+      <p class="eyebrow">FOCUS SESSION</p>
+      <div id="timer-display" class="timer-display">25:00</div>
+      <p id="timer-status">Ready when you are.</p>
+      <div class="timer-presets"><button data-minutes="15">15m</button><button class="selected" data-minutes="25">25m</button><button data-minutes="45">45m</button></div>
+      <div class="timer-actions"><button id="timer-start" class="primary wide">Start focus</button><button id="timer-reset" class="secondary">Reset</button></div>
+    </section>
+
+    <footer><span id="block-status">Blocking is on</span><button id="settings-btn">Edit blocked sites</button></footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
