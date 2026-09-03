@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FocusFox</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="ai-styles.css">
 </head>
 <body class="popup-body">
   <main class="app-shell">
@@ -23,15 +24,19 @@
     </nav>
 
     <section id="helper" class="panel active">
-      <div class="speech"><strong>What are we working on?</strong><br><span>I’ll help you break it down—not just hand you an answer.</span></div>
+      <div class="speech"><strong>Ask your AI tutor</strong><br><span>Get a hint, an explanation, a full solution, or check your work.</span></div>
       <label for="question">Paste a homework question</label>
       <textarea id="question" rows="5" placeholder="Example: Solve 3(x + 4) = 27"></textarea>
-      <div class="subject-row">
+      <div class="page-context-row"><button id="page-btn" class="secondary" type="button">Analyze current page</button><span id="page-status">No page attached</span></div>
+      <div class="subject-row two-selects">
         <select id="subject" aria-label="Subject">
           <option>Math</option><option>Science</option><option>English</option><option>History</option><option>Other</option>
         </select>
-        <button id="help-btn" class="primary">Help me start</button>
+        <select id="help-mode" aria-label="Help type">
+          <option value="explain">Explain it</option><option value="hint">Give a hint</option><option value="solve">Solve it</option><option value="check">Check my work</option>
+        </select>
       </div>
+      <button id="help-btn" class="primary ask-button">Ask FocusFox AI</button>
       <div id="help-output" class="helper-output hidden"></div>
       <label for="scratchpad">Quick notes</label>
       <textarea id="scratchpad" rows="3" placeholder="Your ideas, formulas, or reminders…"></textarea>
@@ -52,7 +57,7 @@
       <div class="timer-actions"><button id="timer-start" class="primary wide">Start focus</button><button id="timer-reset" class="secondary">Reset</button></div>
     </section>
 
-    <footer><span id="block-status">Blocking is on</span><button id="settings-btn">Edit blocked sites</button></footer>
+    <footer><span id="block-status">Blocking is on</span><button id="settings-btn">Settings &amp; API key</button></footer>
   </main>
   <script src="popup.js"></script>
 </body>

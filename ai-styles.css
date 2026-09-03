@@ -1,0 +1,16 @@
+.two-selects select { min-width: 0; }
+.ask-button { width: 100%; margin-top: 9px; }
+.ask-button:disabled { opacity: .7; cursor: wait; }
+.helper-output { max-height: 260px; overflow-y: auto; white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+.helper-output.error { border-color: #e5a09a; background: #fff5f4; color: #8f3028; }
+.settings-section { padding: 18px 0; border-top: 1px solid var(--line); }
+.settings-section h2 { margin: 0 0 10px; font-size: 17px; }
+.key-row { display: flex; gap: 8px; }
+.key-row input { flex: 1; padding: 10px; }
+.settings-section select { width: 100%; padding: 10px; }
+.field-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
+.page-context-row { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
+.page-context-row button { padding: 8px 10px; font-size: 11px; }
+.page-context-row button:disabled { opacity: .65; cursor: wait; }
+#page-status { flex: 1; color: var(--muted); font-size: 10px; line-height: 1.25; }
+#page-status.attached { color: var(--green); font-weight: 750; }

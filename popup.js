@@ -2,6 +2,8 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 let selectedMinutes = 25;
 let timerTick;
+let attachedPage = null;
+let attachedScreenshot = null;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -17,6 +19,7 @@ async function init() {
   $("#block-toggle").addEventListener("change", toggleBlocking);
   $("#scratchpad").addEventListener("input", debounce(event => chrome.storage.local.set({ scratchpad: event.target.value }), 250));
   $("#help-btn").addEventListener("click", createStudyGuide);
+  $("#page-btn").addEventListener("click", attachCurrentPage);
   $("#task-form").addEventListener("submit", addTask);
   $("#task-list").addEventListener("click", handleTaskClick);
   $$("[data-minutes]").forEach(button => button.addEventListener("click", () => selectTimer(button)));
@@ -42,20 +45,65 @@ function updateBlockLabel() {
   $("#block-status").classList.toggle("off", !on);
 }
 
-function createStudyGuide() {
+async function createStudyGuide() {
   const question = $("#question").value.trim();
-  if (!question) return $("#question").focus();
+  if (!question && !attachedPage) return $("#question").focus();
   const subject = $("#subject").value;
-  const guides = {
-    Math: ["Write down what the question gives you.", "Circle the value or variable you need to find.", "Choose a formula or inverse operation.", "Solve one step at a time, then check by substituting your answer."],
-    Science: ["Identify the system, process, or idea being tested.", "List the facts and variables in the question.", "Connect them with a scientific rule or cause-and-effect chain.", "Explain the result in your own words and include units."],
-    English: ["Underline the exact instruction word: analyze, compare, explain, or argue.", "Write a one-sentence claim that answers it.", "Find one specific detail or quotation as evidence.", "Explain how that evidence proves your claim."],
-    History: ["Identify the time, place, people, and event.", "Separate causes from effects.", "Choose one piece of evidence for your main point.", "Explain why the event mattered, not only what happened."],
-    Other: ["Rewrite the question in your own words.", "List what you know and what is missing.", "Split it into the smallest possible first step.", "Try that step and check it against the original question."]
-  };
-  const keyWords = question.split(/\s+/).filter(word => word.length > 5).slice(0, 4).join(", ");
-  $("#help-output").innerHTML = `<strong>Your game plan</strong><ol>${guides[subject].map(step => `<li>${step}</li>`).join("")}</ol>${keyWords ? `<p><b>Key words to inspect:</b> ${escapeHtml(keyWords)}</p>` : ""}<p class="nudge">Start with step 1 in your notes. If you get stuck, identify the exact step that stopped making sense.</p>`;
-  $("#help-output").classList.remove("hidden");
+  const output = $("#help-output");
+  const button = $("#help-btn");
+  output.classList.remove("hidden", "error");
+  output.textContent = "Thinking through your question…";
+  button.disabled = true;
+  button.textContent = "Thinking…";
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "ASK_DEEPSEEK", question, subject, mode: $("#help-mode").value, pageContext: attachedPage, screenshotData: attachedScreenshot });
+    if (!result?.ok) throw new Error(result?.error || "The AI request failed.");
+    output.textContent = result.answer;
+  } catch (error) {
+    output.classList.add("error");
+    output.textContent = `${error.message}\n\nOpen Settings & API key to check your DeepSeek key.`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Ask FocusFox AI";
+  }
+}
+
+async function attachCurrentPage() {
+  const button = $("#page-btn");
+  const status = $("#page-status");
+  button.disabled = true;
+  status.textContent = "Reading page…";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || /^(chrome|edge|about|chrome-extension):/.test(tab.url || "")) {
+      throw new Error("Chrome does not allow page access here. Open a normal webpage first.");
+    }
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const selectedText = window.getSelection()?.toString().trim() || "";
+        const clone = document.body.cloneNode(true);
+        clone.querySelectorAll("script,style,noscript,svg,canvas,input,textarea,select,button").forEach(node => node.remove());
+        const pageText = (clone.innerText || clone.textContent || "").replace(/\s+/g, " ").trim();
+        return { title: document.title, url: location.href, text: (selectedText || pageText).slice(0, 12000), selected: Boolean(selectedText) };
+      }
+    });
+    let screenshot = null;
+    try { screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 65 }); } catch (_) {}
+    if (!result?.text && !screenshot) throw new Error("I could not find readable content on this page.");
+    attachedPage = result || { title: tab.title || "Current page", url: tab.url || "", text: "", selected: false };
+    attachedScreenshot = screenshot;
+    status.textContent = `${result?.selected ? "Selection" : "Page"} attached${screenshot ? " + image" : ""}`;
+    status.classList.add("attached");
+    button.textContent = "Refresh page";
+  } catch (error) {
+    attachedPage = null;
+    attachedScreenshot = null;
+    status.textContent = error.message;
+    status.classList.remove("attached");
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function addTask(event) {

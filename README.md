@@ -1,6 +1,6 @@
 # FocusFox
 
-A Chrome Manifest V3 extension that blocks distracting social sites and gives you a small, private homework workspace.
+A Chrome Manifest V3 extension that blocks distracting social sites and connects to DeepSeek for AI-powered homework help.
 
 ## Features
 
@@ -8,9 +8,10 @@ A Chrome Manifest V3 extension that blocks distracting social sites and gives yo
 - Add or remove any domain from the block list
 - One-click pause switch
 - Friendly blocked page instead of a browser error
-- Homework question breakdowns for Math, Science, English, History, and other subjects
+- AI explanations, hints, full solutions, and answer checking for Math, Science, English, History, and other subjects
+- Optional current-page analysis using selected text, visible page text, and a screenshot of the visible tab
 - Homework task list, scratchpad, and 15/25/45-minute focus timer
-- All data stays on your device; no account or API key needed
+- Your settings stay on your device; AI questions are sent to DeepSeek using your own API key
 
 ## Install in Google Chrome
 
@@ -23,6 +24,16 @@ A Chrome Manifest V3 extension that blocks distracting social sites and gives yo
 
 To change the blocked sites, open the extension and click **Edit blocked sites**.
 
+## Connect DeepSeek
+
+1. Open FocusFox and click **Settings & API key**.
+2. Paste your DeepSeek API key into the password field.
+3. Choose V4 Flash for speed or V4 Pro for stronger answers.
+4. Click **Save changes**.
+5. Return to the Helper tab, choose the type of help, and ask a question.
+
+To use a problem already open in Chrome, select the relevant text if possible, open FocusFox, and click **Analyze current page**. FocusFox attaches the selected text (or visible page text) plus a screenshot of the visible tab. Add an instruction such as “solve question 4” and click **Ask FocusFox AI**.
+
 ## Note
 
-The homework helper is designed to coach you through a question locally. It does not call an online AI, so it cannot generate full custom answers. That keeps it private, free, and safe to install without exposing an API key.
+This build is for personal use. The API key is stored in your local Chrome profile and is never included in the ZIP, but someone with access to your Chrome profile may be able to extract it. Homework questions and any explicitly attached page text/screenshot are sent to DeepSeek to generate answers. A public Web Store release should use a server-side API proxy and updated privacy disclosures.

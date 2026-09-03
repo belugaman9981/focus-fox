@@ -18,7 +18,45 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     refreshRules().then(() => sendResponse({ ok: true })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
+  if (message.type === "ASK_DEEPSEEK") {
+    askDeepSeek(message).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
 });
+
+async function askDeepSeek({ question, subject, mode, pageContext, screenshotData }) {
+  const { deepseekApiKey, deepseekModel = "deepseek-v4-flash" } = await chrome.storage.local.get(["deepseekApiKey", "deepseekModel"]);
+  if (!deepseekApiKey) return { ok: false, error: "No DeepSeek API key saved. Open settings and add one first." };
+  const instructions = {
+    explain: "Teach the solution clearly, step by step. Explain why each step works, then give the final answer.",
+    hint: "Give progressive hints without immediately revealing the final answer. Start with the smallest useful hint.",
+    solve: "Solve the problem completely. Show concise working and clearly label the final answer.",
+    check: "Check the student's work or proposed answer. Identify the first mistake, explain it, and show a corrected solution."
+  };
+  const contextText = pageContext ? `\n\nCURRENT PAGE CONTEXT:\nTitle: ${pageContext.title}\nURL: ${pageContext.url}\n${pageContext.selected ? "Selected text" : "Visible page text"}:\n${pageContext.text}` : "";
+  const userText = `${question || "Identify the homework problem shown on the current page and help me solve it."}${contextText}`;
+  const userContent = screenshotData ? [
+    { type: "text", text: userText },
+    { type: "image_url", image_url: { url: screenshotData, detail: "high" } }
+  ] : userText;
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekApiKey}` },
+    body: JSON.stringify({
+      model: screenshotData ? "deepseek-v4-flash-vision-exp" : deepseekModel,
+      messages: [
+        { role: "system", content: `You are FocusFox, a patient and accurate homework tutor. The subject is ${subject}. ${instructions[mode] || instructions.explain} Use language suitable for a high-school student. For math and science, verify calculations and include units where relevant.` },
+        { role: "user", content: userContent }
+      ],
+      thinking: { type: "enabled" }, reasoning_effort: "high", max_tokens: 1600, stream: false
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error?.message || `DeepSeek request failed (${response.status}).`);
+  const answer = data?.choices?.[0]?.message?.content;
+  if (!answer) throw new Error("DeepSeek returned an empty response. Please try again.");
+  return { ok: true, answer };
+}
 
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === "focus-timer") {
