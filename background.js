@@ -22,7 +22,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     askDeepSeek(message).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
   }
+  if (message.type === "ANALYZE_SNIP") {
+    analyzeSnip(message).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
 });
+
+async function analyzeSnip({ imageData, subject, mode, pageTitle, pageUrl }) {
+  try {
+    const result = await askDeepSeek({
+      question: "Identify the homework problem in this snipped image and help me with it.",
+      subject,
+      mode,
+      pageContext: { title: pageTitle || "Snipped page", url: pageUrl || "", text: "", selected: false },
+      screenshotData: imageData
+    });
+    if (!result.ok) throw new Error(result.error || "The snip could not be analyzed.");
+    await chrome.storage.local.set({ pendingSnipResult: { ok: true, answer: result.answer, createdAt: Date.now() } });
+    chrome.notifications.create({ type: "basic", iconUrl: "icons/icon128.png", title: "FocusFox finished your snip", message: "Open FocusFox to see the explanation." });
+    return { ok: true };
+  } catch (error) {
+    await chrome.storage.local.set({ pendingSnipResult: { ok: false, error: error.message, createdAt: Date.now() } });
+    chrome.notifications.create({ type: "basic", iconUrl: "icons/icon128.png", title: "FocusFox could not analyze the snip", message: "Open FocusFox to see what went wrong." });
+    return { ok: false, error: error.message };
+  }
+}
 
 async function askDeepSeek({ question, subject, mode, pageContext, screenshotData }) {
   const { deepseekApiKey, deepseekModel = "deepseek-v4-flash" } = await chrome.storage.local.get(["deepseekApiKey", "deepseekModel"]);

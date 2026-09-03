@@ -8,24 +8,102 @@ let attachedScreenshot = null;
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const data = await chrome.storage.local.get(["blockingEnabled", "tasks", "scratchpad", "timerEnd", "timerRunning"]);
+  const data = await chrome.storage.local.get(["blockingEnabled", "tasks", "scratchpad", "timerEnd", "timerRunning", "pendingSnipResult"]);
   $("#block-toggle").checked = data.blockingEnabled !== false;
   updateBlockLabel();
   $("#scratchpad").value = data.scratchpad || "";
   renderTasks(data.tasks || []);
   if (data.timerRunning && data.timerEnd) beginTick(data.timerEnd);
+  if (data.pendingSnipResult) {
+    const output = $("#help-output");
+    output.classList.remove("hidden");
+    output.classList.toggle("error", !data.pendingSnipResult.ok);
+    output.textContent = data.pendingSnipResult.ok ? data.pendingSnipResult.answer : `${data.pendingSnipResult.error}\n\nCheck your DeepSeek API key in Settings.`;
+    await chrome.storage.local.remove("pendingSnipResult");
+  }
 
   $$(".tab").forEach(button => button.addEventListener("click", () => switchTab(button.dataset.tab)));
   $("#block-toggle").addEventListener("change", toggleBlocking);
   $("#scratchpad").addEventListener("input", debounce(event => chrome.storage.local.set({ scratchpad: event.target.value }), 250));
   $("#help-btn").addEventListener("click", createStudyGuide);
   $("#page-btn").addEventListener("click", attachCurrentPage);
+  $("#snip-btn").addEventListener("click", startSnip);
   $("#task-form").addEventListener("submit", addTask);
   $("#task-list").addEventListener("click", handleTaskClick);
   $$("[data-minutes]").forEach(button => button.addEventListener("click", () => selectTimer(button)));
   $("#timer-start").addEventListener("click", toggleTimer);
   $("#timer-reset").addEventListener("click", resetTimer);
   $("#settings-btn").addEventListener("click", () => chrome.runtime.openOptionsPage());
+}
+
+async function startSnip() {
+  const status = $("#page-status");
+  const button = $("#snip-btn");
+  button.disabled = true;
+  status.textContent = "Starting snipping tool…";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || /^(chrome|edge|about|chrome-extension):/.test(tab.url || "")) throw new Error("Open a normal webpage before snipping.");
+    const screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+    const subject = $("#subject").value;
+    const mode = $("#help-mode").value;
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: launchFocusFoxSnipper,
+      args: [screenshot, subject, mode]
+    });
+    status.textContent = "Drag around the problem, then reopen FocusFox when notified.";
+    window.close();
+  } catch (error) {
+    status.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+function launchFocusFoxSnipper(screenshotData, subject, mode) {
+  document.getElementById("focusfox-snip-overlay")?.remove();
+  const overlay = document.createElement("div");
+  overlay.id = "focusfox-snip-overlay";
+  Object.assign(overlay.style, { position: "fixed", inset: "0", zIndex: "2147483647", cursor: "crosshair", background: "rgba(8,20,14,.36)", userSelect: "none" });
+  const tip = document.createElement("div");
+  tip.textContent = "Drag around the homework problem • Esc to cancel";
+  Object.assign(tip.style, { position: "fixed", top: "18px", left: "50%", transform: "translateX(-50%)", padding: "11px 17px", borderRadius: "999px", background: "#16221d", color: "white", font: "600 14px system-ui", boxShadow: "0 8px 25px #0005" });
+  const box = document.createElement("div");
+  Object.assign(box.style, { position: "fixed", border: "3px solid #39d98a", background: "rgba(255,255,255,.08)", boxShadow: "0 0 0 9999px rgba(8,20,14,.22)", display: "none" });
+  overlay.append(tip, box);
+  document.documentElement.appendChild(overlay);
+  let startX = 0, startY = 0, dragging = false;
+  const cleanup = () => { overlay.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = event => { if (event.key === "Escape") cleanup(); };
+  document.addEventListener("keydown", onKey);
+  overlay.addEventListener("mousedown", event => {
+    if (event.button !== 0) return;
+    dragging = true; startX = event.clientX; startY = event.clientY; box.style.display = "block";
+    Object.assign(box.style, { left: `${startX}px`, top: `${startY}px`, width: "0", height: "0" });
+  });
+  overlay.addEventListener("mousemove", event => {
+    if (!dragging) return;
+    const left = Math.min(startX, event.clientX), top = Math.min(startY, event.clientY);
+    Object.assign(box.style, { left: `${left}px`, top: `${top}px`, width: `${Math.abs(event.clientX-startX)}px`, height: `${Math.abs(event.clientY-startY)}px` });
+  });
+  overlay.addEventListener("mouseup", event => {
+    if (!dragging) return;
+    dragging = false;
+    const left = Math.min(startX, event.clientX), top = Math.min(startY, event.clientY);
+    const width = Math.abs(event.clientX-startX), height = Math.abs(event.clientY-startY);
+    if (width < 20 || height < 20) { box.style.display = "none"; return; }
+    const image = new Image();
+    image.onload = () => {
+      const scaleX = image.naturalWidth / window.innerWidth, scaleY = image.naturalHeight / window.innerHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scaleX)); canvas.height = Math.max(1, Math.round(height * scaleY));
+      canvas.getContext("2d").drawImage(image, left*scaleX, top*scaleY, width*scaleX, height*scaleY, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL("image/jpeg", .88);
+      cleanup();
+      chrome.runtime.sendMessage({ type: "ANALYZE_SNIP", imageData, subject, mode, pageTitle: document.title, pageUrl: location.href });
+    };
+    image.src = screenshotData;
+  });
 }
 
 function switchTab(id) {

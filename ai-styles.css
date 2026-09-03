@@ -9,8 +9,8 @@
 .key-row input { flex: 1; padding: 10px; }
 .settings-section select { width: 100%; padding: 10px; }
 .field-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
-.page-context-row { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
-.page-context-row button { padding: 8px 10px; font-size: 11px; }
-.page-context-row button:disabled { opacity: .65; cursor: wait; }
-#page-status { flex: 1; color: var(--muted); font-size: 10px; line-height: 1.25; }
+.page-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.page-tools button { padding: 8px 10px; font-size: 11px; }
+.page-tools button:disabled { opacity: .65; cursor: wait; }
+.page-status { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.25; }
 #page-status.attached { color: var(--green); font-weight: 750; }

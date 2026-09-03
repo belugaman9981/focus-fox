@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FocusFox — Study Helper & Social Blocker",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Block distracting social media and get AI-powered homework help with your own DeepSeek API key.",
   "permissions": ["storage", "declarativeNetRequest", "alarms", "notifications", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],

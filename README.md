@@ -10,6 +10,7 @@ A Chrome Manifest V3 extension that blocks distracting social sites and connects
 - Friendly blocked page instead of a browser error
 - AI explanations, hints, full solutions, and answer checking for Math, Science, English, History, and other subjects
 - Optional current-page analysis using selected text, visible page text, and a screenshot of the visible tab
+- Snipping tool: drag a box around one problem and receive an AI explanation when it finishes
 - Homework task list, scratchpad, and 15/25/45-minute focus timer
 - Your settings stay on your device; AI questions are sent to DeepSeek using your own API key
 
@@ -33,6 +34,8 @@ To change the blocked sites, open the extension and click **Edit blocked sites**
 5. Return to the Helper tab, choose the type of help, and ask a question.
 
 To use a problem already open in Chrome, select the relevant text if possible, open FocusFox, and click **Analyze current page**. FocusFox attaches the selected text (or visible page text) plus a screenshot of the visible tab. Add an instruction such as “solve question 4” and click **Ask FocusFox AI**.
+
+For a specific visual problem, choose your subject and help mode, click **Snip problem**, and drag a box around the question. FocusFox analyzes only the cropped image. Reopen the popup when Chrome shows the completion notification.
 
 ## Note
 
