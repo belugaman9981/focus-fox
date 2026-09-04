@@ -109,3 +109,4 @@ async function refreshRules() {
   })) : [];
   await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
 }
+  
