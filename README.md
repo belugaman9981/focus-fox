@@ -11,6 +11,8 @@ A Chrome Manifest V3 extension that blocks distracting social sites and connects
 - AI explanations, hints, full solutions, and answer checking for Math, Science, English, History, and other subjects
 - Optional current-page analysis using selected text, visible page text, and a screenshot of the visible tab
 - Snipping tool: drag a box around one problem and receive an AI explanation when it finishes
+- Daily streaks for completed focus sessions and rotating motivational lines
+- Copy AI answers with one click and clear completed homework tasks
 - Homework task list, scratchpad, and 15/25/45-minute focus timer
 - Your settings stay on your device; AI questions are sent to DeepSeek using your own API key
 

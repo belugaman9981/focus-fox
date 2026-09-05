@@ -14,3 +14,9 @@
 .page-tools button:disabled { opacity: .65; cursor: wait; }
 .page-status { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.25; }
 #page-status.attached { color: var(--green); font-weight: 750; }
+.mini-stats { display: flex; align-items: center; justify-content: space-between; color: var(--green-dark); font-size: 11px; }
+.mini-stats button { border: 0; border-radius: 8px; background: var(--mint); color: var(--green-dark); cursor: pointer; width: 27px; height: 27px; font-weight: 800; }
+.motivation { margin: 5px 0 12px; color: var(--muted); font-size: 11px; font-style: italic; }
+.copy-answer { margin: -6px 0 10px auto; display: block; border: 0; background: transparent; color: var(--green); font-size: 11px; font-weight: 750; cursor: pointer; }
+.clear-completed { display: block; margin: 10px auto 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+.clear-completed:hover,.copy-answer:hover { text-decoration: underline; }

@@ -1,6 +1,6 @@
 const DEFAULT_SITES = [
   "facebook.com", "instagram.com", "tiktok.com", "twitter.com", "x.com",
-  "reddit.com", "snapchat.com", "snapchat.com/web", "pinterest.com", "tumblr.com", "threads.net",
+  "reddit.com", "snapchat.com", "pinterest.com", "tumblr.com", "threads.net",
   "discord.com", "discord.gg", "twitch.tv", "youtube.com"
 ];
 
@@ -91,8 +91,19 @@ chrome.alarms.onAlarm.addListener(alarm => {
       message: "Nice work. Take a short break, then come back strong."
     });
     chrome.storage.local.set({ timerEnd: null, timerRunning: false });
+    recordStudyDay();
   }
 });
+
+async function recordStudyDay() {
+  const today = new Date().toLocaleDateString("en-CA");
+  const { streak = 0, lastStudyDate } = await chrome.storage.local.get(["streak", "lastStudyDate"]);
+  if (lastStudyDate === today) return;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const continued = lastStudyDate === yesterday.toLocaleDateString("en-CA");
+  await chrome.storage.local.set({ streak: continued ? streak + 1 : 1, lastStudyDate: today });
+}
 
 async function refreshRules() {
   const { blockingEnabled = true, blockedSites = DEFAULT_SITES } = await chrome.storage.local.get(["blockingEnabled", "blockedSites"]);

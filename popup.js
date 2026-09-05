@@ -4,21 +4,34 @@ let selectedMinutes = 25;
 let timerTick;
 let attachedPage = null;
 let attachedScreenshot = null;
+let lastAnswer = "";
+const QUOTES = [
+  "Small progress is still progress.",
+  "Start messy. Make it better later.",
+  "One problem at a time.",
+  "Future you will be glad you started.",
+  "You only need enough motivation for the next step.",
+  "A focused 25 minutes beats an unfocused hour."
+];
 
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const data = await chrome.storage.local.get(["blockingEnabled", "tasks", "scratchpad", "timerEnd", "timerRunning", "pendingSnipResult"]);
+  const data = await chrome.storage.local.get(["blockingEnabled", "tasks", "scratchpad", "timerEnd", "timerRunning", "pendingSnipResult", "streak"]);
   $("#block-toggle").checked = data.blockingEnabled !== false;
   updateBlockLabel();
   $("#scratchpad").value = data.scratchpad || "";
   renderTasks(data.tasks || []);
+  const streak = data.streak || 0;
+  $("#streak-label").textContent = `🔥 ${streak} ${streak === 1 ? "day" : "days"} streak`;
+  showRandomQuote();
   if (data.timerRunning && data.timerEnd) beginTick(data.timerEnd);
   if (data.pendingSnipResult) {
     const output = $("#help-output");
     output.classList.remove("hidden");
     output.classList.toggle("error", !data.pendingSnipResult.ok);
     output.textContent = data.pendingSnipResult.ok ? data.pendingSnipResult.answer : `${data.pendingSnipResult.error}\n\nCheck your DeepSeek API key in Settings.`;
+    if (data.pendingSnipResult.ok) setAnswer(data.pendingSnipResult.answer);
     await chrome.storage.local.remove("pendingSnipResult");
   }
 
@@ -28,12 +41,38 @@ async function init() {
   $("#help-btn").addEventListener("click", createStudyGuide);
   $("#page-btn").addEventListener("click", attachCurrentPage);
   $("#snip-btn").addEventListener("click", startSnip);
+  $("#copy-answer").addEventListener("click", copyAnswer);
+  $("#new-quote").addEventListener("click", showRandomQuote);
   $("#task-form").addEventListener("submit", addTask);
   $("#task-list").addEventListener("click", handleTaskClick);
+  $("#clear-completed").addEventListener("click", clearCompletedTasks);
   $$("[data-minutes]").forEach(button => button.addEventListener("click", () => selectTimer(button)));
   $("#timer-start").addEventListener("click", toggleTimer);
   $("#timer-reset").addEventListener("click", resetTimer);
   $("#settings-btn").addEventListener("click", () => chrome.runtime.openOptionsPage());
+}
+
+function showRandomQuote() {
+  const current = $("#motivation").textContent;
+  const choices = QUOTES.filter(quote => quote !== current);
+  $("#motivation").textContent = choices[Math.floor(Math.random() * choices.length)];
+}
+
+function setAnswer(answer) {
+  lastAnswer = answer || "";
+  $("#copy-answer").classList.toggle("hidden", !lastAnswer);
+}
+
+async function copyAnswer() {
+  if (!lastAnswer) return;
+  const button = $("#copy-answer");
+  try {
+    await navigator.clipboard.writeText(lastAnswer);
+    button.textContent = "Copied!";
+  } catch (_) {
+    button.textContent = "Could not copy";
+  }
+  setTimeout(() => button.textContent = "Copy answer", 1400);
 }
 
 async function startSnip() {
@@ -137,7 +176,9 @@ async function createStudyGuide() {
     const result = await chrome.runtime.sendMessage({ type: "ASK_DEEPSEEK", question, subject, mode: $("#help-mode").value, pageContext: attachedPage, screenshotData: attachedScreenshot });
     if (!result?.ok) throw new Error(result?.error || "The AI request failed.");
     output.textContent = result.answer;
+    setAnswer(result.answer);
   } catch (error) {
+    setAnswer("");
     output.classList.add("error");
     output.textContent = `${error.message}\n\nOpen Settings & API key to check your DeepSeek key.`;
   } finally {
@@ -207,11 +248,19 @@ async function handleTaskClick(event) {
   renderTasks(tasks);
 }
 
+async function clearCompletedTasks() {
+  const { tasks = [] } = await chrome.storage.local.get("tasks");
+  const remaining = tasks.filter(task => !task.done);
+  await chrome.storage.local.set({ tasks: remaining });
+  renderTasks(remaining);
+}
+
 function renderTasks(tasks) {
   $("#task-list").innerHTML = tasks.map(task => `<li data-id="${task.id}" class="${task.done ? "done" : ""}"><input type="checkbox" ${task.done ? "checked" : ""} aria-label="Mark complete"><span>${escapeHtml(task.text)}</span><button class="delete-task" aria-label="Delete task">×</button></li>`).join("");
   const left = tasks.filter(task => !task.done).length;
   $("#task-count").textContent = `${left} left`;
   $("#empty-tasks").hidden = tasks.length > 0;
+  $("#clear-completed").hidden = !tasks.some(task => task.done);
 }
 
 function selectTimer(button) {

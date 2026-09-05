@@ -24,6 +24,8 @@
     </nav>
 
     <section id="helper" class="panel active">
+      <div class="mini-stats"><span id="streak-label">🔥 0 day streak</span><button id="new-quote" type="button" title="New motivation">↻</button></div>
+      <p id="motivation" class="motivation"></p>
       <div class="speech"><strong>Ask your AI tutor</strong><br><span>Get a hint, an explanation, a full solution, or check your work.</span></div>
       <label for="question">Paste a homework question</label>
       <textarea id="question" rows="5" placeholder="Example: Solve 3(x + 4) = 27"></textarea>
@@ -38,6 +40,7 @@
       </div>
       <button id="help-btn" class="primary ask-button">Ask FocusFox AI</button>
       <div id="help-output" class="helper-output hidden"></div>
+      <button id="copy-answer" class="copy-answer hidden" type="button">Copy answer</button>
       <label for="scratchpad">Quick notes</label>
       <textarea id="scratchpad" rows="3" placeholder="Your ideas, formulas, or reminders…"></textarea>
     </section>
@@ -47,6 +50,7 @@
       <form id="task-form" class="add-row"><input id="task-input" maxlength="100" placeholder="Add an assignment…" required><button class="primary" type="submit">Add</button></form>
       <ul id="task-list" class="task-list"></ul>
       <p id="empty-tasks" class="empty">Nothing here yet. Add your first task.</p>
+      <button id="clear-completed" class="clear-completed" type="button">Clear completed</button>
     </section>
 
     <section id="timer" class="panel timer-panel">
