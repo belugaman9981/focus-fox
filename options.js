@@ -29,4 +29,4 @@ async function save() {
   sites.value = blockedSites.join("\n"); status.textContent = "Saved!"; setTimeout(() => status.textContent = "", 1800);
 }
 function cleanDomain(value) { return value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]; }
-  
+ 
