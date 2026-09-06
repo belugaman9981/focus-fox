@@ -41,13 +41,14 @@
       <button id="help-btn" class="primary ask-button">Ask FocusFox AI</button>
       <div id="help-output" class="helper-output hidden"></div>
       <button id="copy-answer" class="copy-answer hidden" type="button">Copy answer</button>
+      <div id="followup-box" class="followup-box hidden"><input id="followup-input" placeholder="Ask a follow-up…"><button id="followup-btn" class="primary" type="button">Ask</button><button id="new-chat" class="secondary" type="button">New</button></div>
       <label for="scratchpad">Quick notes</label>
       <textarea id="scratchpad" rows="3" placeholder="Your ideas, formulas, or reminders…"></textarea>
     </section>
 
     <section id="tasks" class="panel">
       <div class="section-head"><div><h2>Homework list</h2><p>One small win at a time.</p></div><span id="task-count" class="pill">0 left</span></div>
-      <form id="task-form" class="add-row"><input id="task-input" maxlength="100" placeholder="Add an assignment…" required><button class="primary" type="submit">Add</button></form>
+      <form id="task-form" class="task-form"><div class="add-row"><input id="task-input" maxlength="100" placeholder="Add an assignment…" required><button class="primary" type="submit">Add</button></div><label class="due-label" for="task-due">Due date <input id="task-due" type="date"></label></form>
       <ul id="task-list" class="task-list"></ul>
       <p id="empty-tasks" class="empty">Nothing here yet. Add your first task.</p>
       <button id="clear-completed" class="clear-completed" type="button">Clear completed</button>
@@ -61,6 +62,7 @@
       <div class="timer-actions"><button id="timer-start" class="primary wide">Start focus</button><button id="timer-reset" class="secondary">Reset</button></div>
     </section>
 
+    <section id="unlock-panel" class="unlock-panel hidden"><strong>Emergency unlock</strong><p>Wait <span id="unlock-seconds">30</span> seconds and explain why you need access.</p><input id="unlock-reason" maxlength="100" placeholder="Reason for unlocking…"><div><button id="cancel-unlock" class="secondary" type="button">Cancel</button><button id="confirm-unlock" class="primary" type="button" disabled>Unlock</button></div></section>
     <footer><span id="block-status">Blocking is on</span><button id="settings-btn">Settings &amp; API key</button></footer>
   </main>
   <script src="popup.js"></script>

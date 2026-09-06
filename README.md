@@ -13,6 +13,10 @@ A Chrome Manifest V3 extension that blocks distracting social sites and connects
 - Snipping tool: drag a box around one problem and receive an AI explanation when it finishes
 - Daily streaks for completed focus sessions and rotating motivational lines
 - Copy AI answers with one click and clear completed homework tasks
+- Continue an AI answer with follow-up questions without restarting
+- Optional daily blocking hours, including overnight schedules
+- A 30-second emergency-unlock delay that requires a reason
+- Homework due dates with an 8:00 AM reminder on the due date
 - Homework task list, scratchpad, and 15/25/45-minute focus timer
 - Your settings stay on your device; AI questions are sent to DeepSeek using your own API key
 

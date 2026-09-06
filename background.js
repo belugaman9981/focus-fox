@@ -8,10 +8,25 @@ chrome.runtime.onInstalled.addListener(async () => {
   const saved = await chrome.storage.local.get(["blockingEnabled", "blockedSites"]);
   if (saved.blockingEnabled === undefined) await chrome.storage.local.set({ blockingEnabled: true });
   if (!saved.blockedSites) await chrome.storage.local.set({ blockedSites: DEFAULT_SITES });
+  chrome.alarms.create("schedule-check", { periodInMinutes: 1 });
+  await restoreTaskAlarms();
   await refreshRules();
 });
 
-chrome.runtime.onStartup.addListener(refreshRules);
+chrome.runtime.onStartup.addListener(() => {
+  chrome.alarms.create("schedule-check", { periodInMinutes: 1 });
+  restoreTaskAlarms();
+  refreshRules();
+});
+
+async function restoreTaskAlarms() {
+  const { tasks = [] } = await chrome.storage.local.get("tasks");
+  for (const task of tasks) {
+    if (!task.due || task.done) continue;
+    const due = new Date(`${task.due}T08:00:00`).getTime();
+    chrome.alarms.create(`task:${task.id}`, { when: Math.max(Date.now() + 5000, due) });
+  }
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "REFRESH_RULES") {
@@ -48,7 +63,7 @@ async function analyzeSnip({ imageData, subject, mode, pageTitle, pageUrl }) {
   }
 }
 
-async function askDeepSeek({ question, subject, mode, pageContext, screenshotData }) {
+async function askDeepSeek({ question, subject, mode, pageContext, screenshotData, history = [] }) {
   const { deepseekApiKey, deepseekModel = "deepseek-v4-flash" } = await chrome.storage.local.get(["deepseekApiKey", "deepseekModel"]);
   if (!deepseekApiKey) return { ok: false, error: "No DeepSeek API key saved. Open settings and add one first." };
   const instructions = {
@@ -70,6 +85,7 @@ async function askDeepSeek({ question, subject, mode, pageContext, screenshotDat
       model: screenshotData ? "deepseek-v4-flash-vision-exp" : deepseekModel,
       messages: [
         { role: "system", content: `You are FocusFox, a patient and accurate homework tutor. The subject is ${subject}. ${instructions[mode] || instructions.explain} Use language suitable for a high-school student. For math and science, verify calculations and include units where relevant.` },
+        ...history.slice(-8).filter(item => ["user", "assistant"].includes(item.role) && typeof item.content === "string"),
         { role: "user", content: userContent }
       ],
       thinking: { type: "enabled" }, reasoning_effort: "high", max_tokens: 1600, stream: false
@@ -93,7 +109,16 @@ chrome.alarms.onAlarm.addListener(alarm => {
     chrome.storage.local.set({ timerEnd: null, timerRunning: false });
     recordStudyDay();
   }
+  if (alarm.name === "schedule-check") refreshRules();
+  if (alarm.name.startsWith("task:")) notifyTaskDue(alarm.name.slice(5));
 });
+
+async function notifyTaskDue(taskId) {
+  const { tasks = [] } = await chrome.storage.local.get("tasks");
+  const task = tasks.find(item => item.id === taskId && !item.done);
+  if (!task) return;
+  chrome.notifications.create({ type: "basic", iconUrl: "icons/icon128.png", title: "Homework due today", message: task.text });
+}
 
 async function recordStudyDay() {
   const today = new Date().toLocaleDateString("en-CA");
@@ -106,10 +131,16 @@ async function recordStudyDay() {
 }
 
 async function refreshRules() {
-  const { blockingEnabled = true, blockedSites = DEFAULT_SITES } = await chrome.storage.local.get(["blockingEnabled", "blockedSites"]);
+  const { blockingEnabled = true, blockedSites = DEFAULT_SITES, scheduleEnabled = false, scheduleStart = "16:00", scheduleEnd = "21:00" } = await chrome.storage.local.get(["blockingEnabled", "blockedSites", "scheduleEnabled", "scheduleStart", "scheduleEnd"]);
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const toMinutes = value => { const [hours, minutes] = value.split(":").map(Number); return hours * 60 + minutes; };
+  const start = toMinutes(scheduleStart), end = toMinutes(scheduleEnd);
+  const insideSchedule = start <= end ? currentMinutes >= start && currentMinutes < end : currentMinutes >= start || currentMinutes < end;
+  const shouldBlock = blockingEnabled && (!scheduleEnabled || insideSchedule);
   const oldRules = await chrome.declarativeNetRequest.getDynamicRules();
   const removeRuleIds = oldRules.map(rule => rule.id);
-  const addRules = blockingEnabled ? blockedSites.map((domain, index) => ({
+  const addRules = shouldBlock ? blockedSites.map((domain, index) => ({
     id: index + 1,
     priority: 1,
     action: { type: "redirect", redirect: { extensionPath: "/blocked.html" } },

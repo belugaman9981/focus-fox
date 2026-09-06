@@ -5,6 +5,8 @@ let timerTick;
 let attachedPage = null;
 let attachedScreenshot = null;
 let lastAnswer = "";
+let conversation = [];
+let unlockTick = null;
 const QUOTES = [
   "Small progress is still progress.",
   "Start messy. Make it better later.",
@@ -39,6 +41,9 @@ async function init() {
   $("#block-toggle").addEventListener("change", toggleBlocking);
   $("#scratchpad").addEventListener("input", debounce(event => chrome.storage.local.set({ scratchpad: event.target.value }), 250));
   $("#help-btn").addEventListener("click", createStudyGuide);
+  $("#followup-btn").addEventListener("click", askFollowup);
+  $("#followup-input").addEventListener("keydown", event => { if (event.key === "Enter") askFollowup(); });
+  $("#new-chat").addEventListener("click", resetChat);
   $("#page-btn").addEventListener("click", attachCurrentPage);
   $("#snip-btn").addEventListener("click", startSnip);
   $("#copy-answer").addEventListener("click", copyAnswer);
@@ -50,6 +55,8 @@ async function init() {
   $("#timer-start").addEventListener("click", toggleTimer);
   $("#timer-reset").addEventListener("click", resetTimer);
   $("#settings-btn").addEventListener("click", () => chrome.runtime.openOptionsPage());
+  $("#cancel-unlock").addEventListener("click", cancelUnlock);
+  $("#confirm-unlock").addEventListener("click", confirmUnlock);
 }
 
 function showRandomQuote() {
@@ -61,6 +68,39 @@ function showRandomQuote() {
 function setAnswer(answer) {
   lastAnswer = answer || "";
   $("#copy-answer").classList.toggle("hidden", !lastAnswer);
+}
+
+async function askFollowup() {
+  const input = $("#followup-input");
+  const question = input.value.trim();
+  if (!question) return input.focus();
+  input.value = "";
+  const output = $("#help-output");
+  output.classList.remove("error");
+  output.textContent = "Thinking about your follow-up…";
+  $("#followup-btn").disabled = true;
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "ASK_DEEPSEEK", question, subject: $("#subject").value, mode: "explain", history: conversation, screenshotData: attachedScreenshot });
+    if (!result?.ok) throw new Error(result?.error || "The AI request failed.");
+    conversation.push({ role: "user", content: question }, { role: "assistant", content: result.answer });
+    output.textContent = result.answer;
+    setAnswer(result.answer);
+  } catch (error) {
+    output.classList.add("error");
+    output.textContent = error.message;
+  } finally { $("#followup-btn").disabled = false; }
+}
+
+function resetChat() {
+  conversation = [];
+  attachedPage = null;
+  attachedScreenshot = null;
+  lastAnswer = "";
+  $("#question").value = "";
+  $("#help-output").classList.add("hidden");
+  $("#followup-box").classList.add("hidden");
+  $("#copy-answer").classList.add("hidden");
+  $("#page-status").textContent = "No page attached";
 }
 
 async function copyAnswer() {
@@ -151,15 +191,58 @@ function switchTab(id) {
 }
 
 async function toggleBlocking(event) {
-  await chrome.storage.local.set({ blockingEnabled: event.target.checked });
-  await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
+  if (event.target.checked) {
+    cancelUnlock();
+    await chrome.storage.local.set({ blockingEnabled: true });
+    await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
+    updateBlockLabel();
+    return;
+  }
+  event.target.checked = true;
+  startUnlockCountdown();
+}
+
+function startUnlockCountdown() {
+  clearInterval(unlockTick);
+  let seconds = 30;
+  $("#unlock-panel").classList.remove("hidden");
+  $("#unlock-seconds").textContent = seconds;
+  $("#confirm-unlock").disabled = true;
+  unlockTick = setInterval(() => {
+    seconds -= 1;
+    $("#unlock-seconds").textContent = seconds;
+    if (seconds <= 0) { clearInterval(unlockTick); unlockTick = null; $("#confirm-unlock").disabled = false; }
+  }, 1000);
+}
+
+function cancelUnlock() {
+  clearInterval(unlockTick); unlockTick = null;
+  $("#unlock-panel").classList.add("hidden");
+  $("#unlock-reason").value = "";
+  $("#block-toggle").checked = true;
   updateBlockLabel();
 }
 
-function updateBlockLabel() {
+async function confirmUnlock() {
+  const reason = $("#unlock-reason").value.trim();
+  if (reason.length < 3) { $("#unlock-reason").focus(); return; }
+  await chrome.storage.local.set({ blockingEnabled: false, lastUnlockReason: reason, lastUnlockAt: Date.now() });
+  await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
+  $("#unlock-panel").classList.add("hidden");
+  $("#block-toggle").checked = false;
+  updateBlockLabel();
+}
+
+async function updateBlockLabel() {
   const on = $("#block-toggle").checked;
-  $("#block-status").textContent = on ? "Blocking is on" : "Blocking is paused";
-  $("#block-status").classList.toggle("off", !on);
+  const { scheduleEnabled = false, scheduleStart = "16:00", scheduleEnd = "21:00" } = await chrome.storage.local.get(["scheduleEnabled", "scheduleStart", "scheduleEnd"]);
+  const [startHour, startMinute] = scheduleStart.split(":").map(Number);
+  const [endHour, endMinute] = scheduleEnd.split(":").map(Number);
+  const current = new Date().getHours() * 60 + new Date().getMinutes();
+  const start = startHour * 60 + startMinute, end = endHour * 60 + endMinute;
+  const scheduledNow = start <= end ? current >= start && current < end : current >= start || current < end;
+  $("#block-status").textContent = !on ? "Blocking is paused" : scheduleEnabled && !scheduledNow ? "Scheduled — currently off" : "Blocking is on";
+  $("#block-status").classList.toggle("off", !on || (scheduleEnabled && !scheduledNow));
 }
 
 async function createStudyGuide() {
@@ -176,7 +259,9 @@ async function createStudyGuide() {
     const result = await chrome.runtime.sendMessage({ type: "ASK_DEEPSEEK", question, subject, mode: $("#help-mode").value, pageContext: attachedPage, screenshotData: attachedScreenshot });
     if (!result?.ok) throw new Error(result?.error || "The AI request failed.");
     output.textContent = result.answer;
+    conversation = [{ role: "user", content: question || "Help with the attached page." }, { role: "assistant", content: result.answer }];
     setAnswer(result.answer);
+    $("#followup-box").classList.remove("hidden");
   } catch (error) {
     setAnswer("");
     output.classList.add("error");
@@ -230,9 +315,12 @@ async function addTask(event) {
   const text = $("#task-input").value.trim();
   if (!text) return;
   const { tasks = [] } = await chrome.storage.local.get("tasks");
-  tasks.push({ id: crypto.randomUUID(), text, done: false });
+  const task = { id: crypto.randomUUID(), text, done: false, due: $("#task-due").value || null };
+  tasks.push(task);
   await chrome.storage.local.set({ tasks });
+  await scheduleTaskReminder(task);
   $("#task-input").value = "";
+  $("#task-due").value = "";
   renderTasks(tasks);
 }
 
@@ -242,26 +330,39 @@ async function handleTaskClick(event) {
   const { tasks = [] } = await chrome.storage.local.get("tasks");
   const index = tasks.findIndex(task => task.id === row.dataset.id);
   if (index < 0) return;
-  if (event.target.matches(".delete-task")) tasks.splice(index, 1);
-  else if (event.target.matches("input")) tasks[index].done = event.target.checked;
+  if (event.target.matches(".delete-task")) { await chrome.alarms.clear(`task:${tasks[index].id}`); tasks.splice(index, 1); }
+  else if (event.target.matches('input[type="checkbox"]')) {
+    tasks[index].done = event.target.checked;
+    if (tasks[index].done) await chrome.alarms.clear(`task:${tasks[index].id}`); else await scheduleTaskReminder(tasks[index]);
+  }
   await chrome.storage.local.set({ tasks });
   renderTasks(tasks);
 }
 
 async function clearCompletedTasks() {
   const { tasks = [] } = await chrome.storage.local.get("tasks");
+  await Promise.all(tasks.filter(task => task.done).map(task => chrome.alarms.clear(`task:${task.id}`)));
   const remaining = tasks.filter(task => !task.done);
   await chrome.storage.local.set({ tasks: remaining });
   renderTasks(remaining);
 }
 
+async function scheduleTaskReminder(task) {
+  if (!task.due || task.done) return;
+  const due = new Date(`${task.due}T08:00:00`);
+  const when = Math.max(Date.now() + 5000, due.getTime());
+  await chrome.alarms.create(`task:${task.id}`, { when });
+}
+
 function renderTasks(tasks) {
-  $("#task-list").innerHTML = tasks.map(task => `<li data-id="${task.id}" class="${task.done ? "done" : ""}"><input type="checkbox" ${task.done ? "checked" : ""} aria-label="Mark complete"><span>${escapeHtml(task.text)}</span><button class="delete-task" aria-label="Delete task">×</button></li>`).join("");
+  $("#task-list").innerHTML = tasks.map(task => `<li data-id="${task.id}" class="${task.done ? "done" : ""}"><input type="checkbox" ${task.done ? "checked" : ""} aria-label="Mark complete"><span>${escapeHtml(task.text)}${task.due ? `<small>Due ${formatDueDate(task.due)}</small>` : ""}</span><button class="delete-task" aria-label="Delete task">×</button></li>`).join("");
   const left = tasks.filter(task => !task.done).length;
   $("#task-count").textContent = `${left} left`;
   $("#empty-tasks").hidden = tasks.length > 0;
   $("#clear-completed").hidden = !tasks.some(task => task.done);
 }
+
+function formatDueDate(value) { return new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
 
 function selectTimer(button) {
   if ($("#timer-start").dataset.running === "true") return;

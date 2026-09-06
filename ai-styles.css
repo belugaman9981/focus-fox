@@ -20,3 +20,20 @@
 .copy-answer { margin: -6px 0 10px auto; display: block; border: 0; background: transparent; color: var(--green); font-size: 11px; font-weight: 750; cursor: pointer; }
 .clear-completed { display: block; margin: 10px auto 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
 .clear-completed:hover,.copy-answer:hover { text-decoration: underline; }
+.followup-box { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; margin: 8px 0 11px; }
+.followup-box input { min-width: 0; padding: 8px; font-size: 11px; }
+.followup-box button { padding: 8px 10px; font-size: 11px; }
+.unlock-panel { margin: 0 15px 10px; padding: 13px; border: 1px solid #efc08f; border-radius: 12px; background: #fff8ec; font-size: 11px; }
+.unlock-panel p { margin: 5px 0 9px; color: var(--muted); }
+.unlock-panel input { width: 100%; padding: 8px; }
+.unlock-panel div { display: flex; justify-content: flex-end; gap: 7px; margin-top: 8px; }
+.unlock-panel button { padding: 7px 10px; font-size: 11px; }
+.unlock-panel button:disabled { opacity: .55; cursor: not-allowed; }
+.task-form { margin-top: 9px; }
+.due-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; font-weight: 650; }
+.due-label input { padding: 5px 7px; }
+.task-list li span small { display: block; margin-top: 3px; color: var(--orange); font-size: 9px; font-weight: 700; }
+.schedule-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.schedule-toggle input { accent-color: var(--green); }
+.schedule-times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.schedule-times input { display: block; width: 100%; padding: 9px; margin-top: 5px; }
