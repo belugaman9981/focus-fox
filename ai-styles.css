@@ -37,4 +37,3 @@
 .schedule-toggle input { accent-color: var(--green); }
 .schedule-times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .schedule-times input { display: block; width: 100%; padding: 9px; margin-top: 5px; }
- 
