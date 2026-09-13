@@ -130,7 +130,19 @@ async function recordStudyDay() {
   await chrome.storage.local.set({ streak: continued ? streak + 1 : 1, lastStudyDate: today });
 }
 
-async function refreshRules() {
+// Serialize refreshes from settings, startup, and the schedule alarm.
+let rulesRefresh = Promise.resolve();
+function refreshRules() {
+  rulesRefresh = rulesRefresh.catch(() => {}).then(applyRules);
+  return rulesRefresh;
+}
+
+async function applyRules() {
+  const { adBlockingEnabled = false } = await chrome.storage.local.get("adBlockingEnabled");
+  await chrome.declarativeNetRequest.updateEnabledRulesets({
+    enableRulesetIds: adBlockingEnabled ? ["ad_blocker"] : [],
+    disableRulesetIds: adBlockingEnabled ? [] : ["ad_blocker"]
+  });
   const { blockingEnabled = true, blockedSites = DEFAULT_SITES, scheduleEnabled = false, scheduleStart = "16:00", scheduleEnd = "21:00" } = await chrome.storage.local.get(["blockingEnabled", "blockedSites", "scheduleEnabled", "scheduleStart", "scheduleEnd"]);
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();

@@ -11,6 +11,9 @@
     "default_title": "FocusFox"
   },
   "options_page": "options.html",
+  "declarative_net_request": {
+    "rule_resources": [{ "id": "ad_blocker", "enabled": false, "path": "rules/ads.json" }]
+  },
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

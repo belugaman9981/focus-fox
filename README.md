@@ -7,6 +7,11 @@ A Chrome Manifest V3 extension that blocks distracting social sites and connects
 - Blocks common social media sites by default
 - Add or remove any domain from the block list
 - One-click pause switch
+- Optional ad blocker for common advertising domains, independent of social blocking
+- Quick ad blocker toggle directly in the popup
+- Homework completion counter and progress bar
+- Copy or clear quick notes, with Undo clear available even after reopening the popup (until you type new notes)
+- Reopens your last-used Helper, Tasks, or Timer tab; completed snips open in Helper
 - Friendly blocked page instead of a browser error
 - AI explanations, hints, full solutions, and answer checking for Math, Science, English, History, and other subjects
 - Optional current-page analysis using selected text, visible page text, and a screenshot of the visible tab
@@ -30,6 +35,10 @@ A Chrome Manifest V3 extension that blocks distracting social sites and connects
 6. Pin FocusFox from Chrome's puzzle-piece menu.
 
 To change the blocked sites, open the extension and click **Edit blocked sites**.
+
+To enable ad blocking, open **Settings & API key**, turn on **Block ads** under **Ad blocker**, and click **Save changes**. Reload open pages afterward. It is off by default and stays enabled even when social blocking is paused or outside scheduled hours. Uncheck it and save to turn it off if a site stops working.
+
+The ad blocker uses a small built-in domain list in `rules/ads.json`; it does not download filter lists. It blocks ad network requests, but does not remove empty ad spaces or guarantee blocking of all ads, especially ads served by the site itself or video ads. Rules use Chrome's [declarativeNetRequest API](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest).
 
 ## Connect DeepSeek
 

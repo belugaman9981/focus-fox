@@ -17,6 +17,8 @@
       </label>
     </header>
 
+    <div class="quick-controls"><label for="ad-toggle"><input id="ad-toggle" type="checkbox" disabled> Block ads</label><span id="ad-status" role="status">Loading…</span></div>
+
     <nav class="tabs" aria-label="Helper sections">
       <button class="tab active" data-tab="helper">Helper</button>
       <button class="tab" data-tab="tasks">Tasks</button>
@@ -42,12 +44,14 @@
       <div id="help-output" class="helper-output hidden"></div>
       <button id="copy-answer" class="copy-answer hidden" type="button">Copy answer</button>
       <div id="followup-box" class="followup-box hidden"><input id="followup-input" placeholder="Ask a follow-up…"><button id="followup-btn" class="primary" type="button">Ask</button><button id="new-chat" class="secondary" type="button">New</button></div>
-      <label for="scratchpad">Quick notes</label>
+      <div class="notes-heading"><label for="scratchpad">Quick notes</label><div><button id="copy-notes" class="text-button" type="button">Copy</button><button id="clear-notes" class="text-button" type="button">Clear</button><button id="undo-notes" class="text-button" type="button" hidden>Undo clear</button></div></div>
       <textarea id="scratchpad" rows="3" placeholder="Your ideas, formulas, or reminders…"></textarea>
+      <span id="notes-status" class="page-status" role="status"></span>
     </section>
 
     <section id="tasks" class="panel">
       <div class="section-head"><div><h2>Homework list</h2><p>One small win at a time.</p></div><span id="task-count" class="pill">0 left</span></div>
+      <div class="task-progress"><progress id="task-progress" value="0" max="1" aria-label="Homework completed"></progress><span id="task-progress-label" role="status">Add a task to get started.</span></div>
       <form id="task-form" class="task-form"><div class="add-row"><input id="task-input" maxlength="100" placeholder="Add an assignment…" required><button class="primary" type="submit">Add</button></div><label class="due-label" for="task-due">Due date <input id="task-due" type="date"></label></form>
       <ul id="task-list" class="task-list"></ul>
       <p id="empty-tasks" class="empty">Nothing here yet. Add your first task.</p>

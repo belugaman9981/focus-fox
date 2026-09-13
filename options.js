@@ -6,14 +6,17 @@ const model = document.querySelector("#model");
 const scheduleEnabled = document.querySelector("#schedule-enabled");
 const scheduleStart = document.querySelector("#schedule-start");
 const scheduleEnd = document.querySelector("#schedule-end");
+const adBlockingEnabled = document.querySelector("#ad-blocking-enabled");
+let statusTimeout;
 document.addEventListener("DOMContentLoaded", async () => {
-  const data = await chrome.storage.local.get(["blockedSites", "deepseekApiKey", "deepseekModel", "scheduleEnabled", "scheduleStart", "scheduleEnd"]);
+  const data = await chrome.storage.local.get(["blockedSites", "deepseekApiKey", "deepseekModel", "scheduleEnabled", "scheduleStart", "scheduleEnd", "adBlockingEnabled"]);
   sites.value = (data.blockedSites || DEFAULT_SITES).join("\n");
   apiKey.value = data.deepseekApiKey || "";
   model.value = data.deepseekModel || "deepseek-v4-flash";
   scheduleEnabled.checked = data.scheduleEnabled || false;
   scheduleStart.value = data.scheduleStart || "16:00";
   scheduleEnd.value = data.scheduleEnd || "21:00";
+  adBlockingEnabled.checked = data.adBlockingEnabled === true;
 });
 document.querySelector("#save").addEventListener("click", save);
 document.querySelector("#reset").addEventListener("click", () => { sites.value = DEFAULT_SITES.join("\n"); save(); });
@@ -23,9 +26,22 @@ document.querySelector("#show-key").addEventListener("click", event => {
   event.target.textContent = showing ? "Show" : "Hide";
 });
 async function save() {
-  const blockedSites = [...new Set(sites.value.split(/\n|,/).map(cleanDomain).filter(Boolean))];
-  await chrome.storage.local.set({ blockedSites, deepseekApiKey: apiKey.value.trim(), deepseekModel: model.value, scheduleEnabled: scheduleEnabled.checked, scheduleStart: scheduleStart.value, scheduleEnd: scheduleEnd.value });
-  await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
-  sites.value = blockedSites.join("\n"); status.textContent = "Saved!"; setTimeout(() => status.textContent = "", 1800);
+  clearTimeout(statusTimeout);
+  document.querySelector("#save").disabled = true;
+  document.querySelector("#reset").disabled = true;
+  status.textContent = "Saving…";
+  try {
+    const blockedSites = [...new Set(sites.value.split(/\n|,/).map(cleanDomain).filter(Boolean))];
+    await chrome.storage.local.set({ blockedSites, deepseekApiKey: apiKey.value.trim(), deepseekModel: model.value, scheduleEnabled: scheduleEnabled.checked, scheduleStart: scheduleStart.value, scheduleEnd: scheduleEnd.value, adBlockingEnabled: adBlockingEnabled.checked });
+    const result = await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
+    if (!result?.ok) throw new Error(result?.error || "Could not apply blocking rules. Try saving again.");
+    sites.value = blockedSites.join("\n"); status.textContent = "Saved! Reload open pages to apply ad blocking changes.";
+    statusTimeout = setTimeout(() => status.textContent = "", 5000);
+  } catch (error) {
+    status.textContent = `Could not apply changes: ${error.message}`;
+  } finally {
+    document.querySelector("#save").disabled = false;
+    document.querySelector("#reset").disabled = false;
+  }
 }
 function cleanDomain(value) { return value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]; }

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": [
+        "doubleclick.net",
+        "googlesyndication.com",
+        "googleadservices.com",
+        "adnxs.com",
+        "adsrvr.org",
+        "adform.net",
+        "advertising.com",
+        "amazon-adsystem.com",
+        "casalemedia.com",
+        "criteo.com",
+        "criteo.net",
+        "openx.net",
+        "pubmatic.com",
+        "rubiconproject.com",
+        "smartadserver.com",
+        "taboola.com",
+        "outbrain.com",
+        "media.net",
+        "sharethrough.com",
+        "yieldmo.com"
+      ],
+      "resourceTypes": ["sub_frame", "stylesheet", "script", "image", "font", "object", "xmlhttprequest", "ping", "media", "websocket", "other"]
+    }
+  }
+]

@@ -7,6 +7,7 @@ let attachedScreenshot = null;
 let lastAnswer = "";
 let conversation = [];
 let unlockTick = null;
+let notesWrite = Promise.resolve();
 const QUOTES = [
   "Small progress is still progress.",
   "Start messy. Make it better later.",
@@ -19,10 +20,16 @@ const QUOTES = [
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const data = await chrome.storage.local.get(["blockingEnabled", "tasks", "scratchpad", "timerEnd", "timerRunning", "pendingSnipResult", "streak"]);
+  const data = await chrome.storage.local.get(["blockingEnabled", "adBlockingEnabled", "tasks", "scratchpad", "clearedNotes", "lastTab", "timerEnd", "timerRunning", "pendingSnipResult", "streak"]);
   $("#block-toggle").checked = data.blockingEnabled !== false;
   updateBlockLabel();
   $("#scratchpad").value = data.scratchpad || "";
+  $("#undo-notes").hidden = !data.clearedNotes || Boolean(data.scratchpad);
+  updateNotesButtons();
+  $("#ad-toggle").checked = data.adBlockingEnabled === true;
+  $("#ad-toggle").disabled = false;
+  $("#ad-status").textContent = data.adBlockingEnabled ? "On" : "Off";
+  switchTab(data.pendingSnipResult ? "helper" : data.lastTab || "helper");
   renderTasks(data.tasks || []);
   const streak = data.streak || 0;
   $("#streak-label").textContent = `🔥 ${streak} ${streak === 1 ? "day" : "days"} streak`;
@@ -37,9 +44,20 @@ async function init() {
     await chrome.storage.local.remove("pendingSnipResult");
   }
 
-  $$(".tab").forEach(button => button.addEventListener("click", () => switchTab(button.dataset.tab)));
+  $$(".tab").forEach(button => button.addEventListener("click", () => {
+    switchTab(button.dataset.tab);
+    chrome.storage.local.set({ lastTab: button.dataset.tab });
+  }));
   $("#block-toggle").addEventListener("change", toggleBlocking);
-  $("#scratchpad").addEventListener("input", debounce(event => chrome.storage.local.set({ scratchpad: event.target.value }), 250));
+  $("#ad-toggle").addEventListener("change", toggleAds);
+  $("#scratchpad").addEventListener("input", () => {
+    updateNotesButtons();
+    $("#undo-notes").hidden = true;
+    saveNotes({ scratchpad: $("#scratchpad").value, clearedNotes: "" });
+  });
+  $("#copy-notes").addEventListener("click", copyNotes);
+  $("#clear-notes").addEventListener("click", clearNotes);
+  $("#undo-notes").addEventListener("click", undoClearNotes);
   $("#help-btn").addEventListener("click", createStudyGuide);
   $("#followup-btn").addEventListener("click", askFollowup);
   $("#followup-input").addEventListener("keydown", event => { if (event.key === "Enter") askFollowup(); });
@@ -186,8 +204,103 @@ function launchFocusFoxSnipper(screenshotData, subject, mode) {
 }
 
 function switchTab(id) {
+  if (!["helper", "tasks", "timer"].includes(id)) id = "helper";
   $$(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.tab === id));
   $$(".panel").forEach(panel => panel.classList.toggle("active", panel.id === id));
+}
+
+async function toggleAds() {
+  const toggle = $("#ad-toggle");
+  const enabled = toggle.checked;
+  let previous = !enabled;
+  let saved = false;
+  toggle.disabled = true;
+  $("#ad-status").textContent = "Applying…";
+  try {
+    const data = await chrome.storage.local.get("adBlockingEnabled");
+    previous = data.adBlockingEnabled === true;
+    await chrome.storage.local.set({ adBlockingEnabled: enabled });
+    saved = true;
+    const result = await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
+    if (!result?.ok) throw new Error(result?.error || "Could not apply ad blocking.");
+    $("#ad-status").textContent = `${enabled ? "On" : "Off"} · Reload open pages`;
+  } catch (error) {
+    toggle.checked = previous;
+    $("#ad-status").textContent = "Could not apply. Try again.";
+    if (saved) {
+      try {
+        await chrome.storage.local.set({ adBlockingEnabled: previous });
+        const restored = await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
+        if (!restored?.ok) throw new Error("Restore failed");
+      } catch (_) {
+        $("#ad-status").textContent = "Could not restore ad blocking. Open Settings and save again.";
+      }
+    }
+  } finally {
+    toggle.disabled = false;
+  }
+}
+
+function updateNotesButtons() {
+  const empty = !$("#scratchpad").value;
+  $("#copy-notes").disabled = empty;
+  $("#clear-notes").disabled = empty;
+}
+
+function saveNotes(values) {
+  // Preserve typing/clear/undo order even when storage writes take time.
+  notesWrite = notesWrite.catch(() => {}).then(() => chrome.storage.local.set(values));
+  notesWrite.then(() => { $("#notes-status").textContent = "Saved on this device"; }, () => {
+    $("#notes-status").textContent = "Could not save notes. Try again.";
+  });
+  return notesWrite;
+}
+
+async function copyNotes() {
+  try {
+    await navigator.clipboard.writeText($("#scratchpad").value);
+    $("#notes-status").textContent = "Notes copied";
+  } catch (_) {
+    $("#notes-status").textContent = "Could not copy. Select your notes and copy manually.";
+  }
+}
+
+async function clearNotes() {
+  const previous = $("#scratchpad").value;
+  if (!previous) return;
+  $("#scratchpad").disabled = true;
+  $("#clear-notes").disabled = true;
+  try {
+    await saveNotes({ scratchpad: "", clearedNotes: previous });
+    $("#scratchpad").value = "";
+    $("#undo-notes").hidden = false;
+    $("#notes-status").textContent = "Notes cleared. Undo is available until you type new notes.";
+  } catch (_) {
+    // Keep the visible notes when saving fails.
+  } finally {
+    $("#scratchpad").disabled = false;
+    updateNotesButtons();
+  }
+}
+
+async function undoClearNotes() {
+  $("#undo-notes").disabled = true;
+  $("#scratchpad").disabled = true;
+  try {
+    await notesWrite.catch(() => {});
+    const { clearedNotes = "" } = await chrome.storage.local.get("clearedNotes");
+    if (!clearedNotes || $("#scratchpad").value) return;
+    await saveNotes({ scratchpad: clearedNotes, clearedNotes: "" });
+    $("#scratchpad").value = clearedNotes;
+    $("#undo-notes").hidden = true;
+    $("#notes-status").textContent = "Notes restored";
+  } catch (_) {
+    $("#notes-status").textContent = "Could not restore notes. Try again.";
+  } finally {
+    $("#undo-notes").disabled = false;
+    $("#scratchpad").disabled = false;
+    updateNotesButtons();
+  }
 }
 
 async function toggleBlocking(event) {
@@ -357,6 +470,10 @@ async function scheduleTaskReminder(task) {
 function renderTasks(tasks) {
   $("#task-list").innerHTML = tasks.map(task => `<li data-id="${task.id}" class="${task.done ? "done" : ""}"><input type="checkbox" ${task.done ? "checked" : ""} aria-label="Mark complete"><span>${escapeHtml(task.text)}${task.due ? `<small>Due ${formatDueDate(task.due)}</small>` : ""}</span><button class="delete-task" aria-label="Delete task">×</button></li>`).join("");
   const left = tasks.filter(task => !task.done).length;
+  const completed = tasks.length - left;
+  $("#task-progress").max = tasks.length || 1;
+  $("#task-progress").value = completed;
+  $("#task-progress-label").textContent = tasks.length ? `${completed} of ${tasks.length} complete${left === 0 ? " — all done!" : ""}` : "Add a task to get started.";
   $("#task-count").textContent = `${left} left`;
   $("#empty-tasks").hidden = tasks.length > 0;
   $("#clear-completed").hidden = !tasks.some(task => task.done);
