@@ -12,7 +12,7 @@ function extension(saved = {}) {
   const event = name => ({ addListener: callback => { events[name] = callback; } });
   const chrome = {
     runtime: { onInstalled: event("installed"), onStartup: event("startup"), onMessage: event("message") },
-    alarms: { create() {}, onAlarm: event("alarm") },
+    alarms: { create() {}, clear() {}, onAlarm: event("alarm") },
     storage: { local: {
       async get(keys) { return Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, data[key]])); },
       async set(values) { Object.assign(data, values); }

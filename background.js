@@ -10,12 +10,14 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!saved.blockedSites) await chrome.storage.local.set({ blockedSites: DEFAULT_SITES });
   chrome.alarms.create("schedule-check", { periodInMinutes: 1 });
   await restoreTaskAlarms();
+  await timerAction({ action: "sync" });
   await refreshRules();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create("schedule-check", { periodInMinutes: 1 });
   restoreTaskAlarms();
+  timerAction({ action: "sync" });
   refreshRules();
 });
 
@@ -29,6 +31,10 @@ async function restoreTaskAlarms() {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === "TIMER_ACTION") {
+    timerAction(message).then(state => sendResponse({ ok: true, state })).catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (message.type === "REFRESH_RULES") {
     refreshRules().then(() => sendResponse({ ok: true })).catch(error => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -99,19 +105,72 @@ async function askDeepSeek({ question, subject, mode, pageContext, screenshotDat
 }
 
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === "focus-timer") {
-    chrome.notifications.create({
-      type: "basic",
-      iconUrl: "icons/icon128.png",
-      title: "Focus session complete!",
-      message: "Nice work. Take a short break, then come back strong."
-    });
-    chrome.storage.local.set({ timerEnd: null, timerRunning: false });
-    recordStudyDay();
-  }
+  if (["focus-timer", "break-timer"].includes(alarm.name)) return timerAction({ action: "sync" });
   if (alarm.name === "schedule-check") refreshRules();
   if (alarm.name.startsWith("task:")) notifyTaskDue(alarm.name.slice(5));
 });
+
+// Keep popup commands and alarm completion in order, even with the popup closed.
+let timerQueue = Promise.resolve();
+function timerAction(message) {
+  timerQueue = timerQueue.catch(() => {}).then(() => applyTimerAction(message));
+  return timerQueue;
+}
+
+async function applyTimerAction({ action, minutes }) {
+  const saved = await chrome.storage.local.get(["timerMode", "timerEnd", "timerRunning", "focusMinutes"]);
+  const state = {
+    timerMode: saved.timerMode === "break" ? "break" : "focus",
+    timerEnd: saved.timerEnd || null,
+    timerRunning: saved.timerRunning === true,
+    focusMinutes: [15, 25, 45].includes(saved.focusMinutes) ? saved.focusMinutes : 25
+  };
+  let notice;
+  if (action === "sync") {
+    if (state.timerRunning && state.timerEnd && state.timerEnd <= Date.now()) {
+      if (state.timerMode === "focus") {
+        state.timerMode = "break";
+        state.timerEnd = Date.now() + 5 * 60 * 1000;
+        notice = { title: "Focus session complete!", message: "Your five-minute break has started. Stretch, rest your eyes, and recharge." };
+      } else {
+        state.timerMode = "focus";
+        state.timerEnd = null;
+        state.timerRunning = false;
+        notice = { title: "Break complete!", message: "Ready for another round? Open FocusFox to start your next focus session." };
+      }
+    }
+  } else if (action === "start") {
+    if (state.timerRunning) return state;
+    state.timerRunning = true;
+    state.timerEnd = Date.now() + (state.timerMode === "break" ? 5 : state.focusMinutes) * 60 * 1000;
+  } else if (action === "break") {
+    if (state.timerRunning) throw new Error("Stop the current timer before starting a break.");
+    state.timerMode = "break";
+    state.timerRunning = true;
+    state.timerEnd = Date.now() + 5 * 60 * 1000;
+  } else if (action === "stop" || action === "reset") {
+    state.timerRunning = false;
+    state.timerEnd = null;
+    if (action === "reset") state.timerMode = "focus";
+    if (minutes !== undefined) {
+      if (![15, 25, 45].includes(minutes)) throw new Error("Choose a 15, 25, or 45 minute session.");
+      state.focusMinutes = minutes;
+    }
+  } else {
+    throw new Error("Unknown timer action.");
+  }
+  await chrome.alarms.clear("focus-timer");
+  await chrome.alarms.clear("break-timer");
+  if (state.timerRunning && state.timerEnd) {
+    await chrome.alarms.create(`${state.timerMode}-timer`, { when: state.timerEnd });
+  }
+  await chrome.storage.local.set(state);
+  if (notice) {
+    if (state.timerMode === "break") await recordStudyDay();
+    await chrome.notifications.create({ type: "basic", iconUrl: "icons/icon128.png", ...notice });
+  }
+  return state;
+}
 
 async function notifyTaskDue(taskId) {
   const { tasks = [] } = await chrome.storage.local.get("tasks");

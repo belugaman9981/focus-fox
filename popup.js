@@ -2,6 +2,7 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 let selectedMinutes = 25;
 let timerTick;
+let timerBusy = false;
 let attachedPage = null;
 let attachedScreenshot = null;
 let lastAnswer = "";
@@ -20,7 +21,7 @@ const QUOTES = [
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const data = await chrome.storage.local.get(["blockingEnabled", "adBlockingEnabled", "tasks", "scratchpad", "clearedNotes", "lastTab", "timerEnd", "timerRunning", "pendingSnipResult", "streak"]);
+  const data = await chrome.storage.local.get(["blockingEnabled", "adBlockingEnabled", "tasks", "scratchpad", "clearedNotes", "lastTab", "timerEnd", "timerRunning", "timerMode", "focusMinutes", "pendingSnipResult", "streak"]);
   $("#block-toggle").checked = data.blockingEnabled !== false;
   updateBlockLabel();
   $("#scratchpad").value = data.scratchpad || "";
@@ -34,7 +35,13 @@ async function init() {
   const streak = data.streak || 0;
   $("#streak-label").textContent = `🔥 ${streak} ${streak === 1 ? "day" : "days"} streak`;
   showRandomQuote();
-  if (data.timerRunning && data.timerEnd) beginTick(data.timerEnd);
+  renderTimer(data);
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && ["timerRunning", "timerEnd", "timerMode", "focusMinutes"].some(key => key in changes)) {
+      chrome.storage.local.get(["timerRunning", "timerEnd", "timerMode", "focusMinutes"]).then(renderTimer);
+    }
+  });
+  await sendTimerAction("sync");
   if (data.pendingSnipResult) {
     const output = $("#help-output");
     output.classList.remove("hidden");
@@ -72,6 +79,7 @@ async function init() {
   $$("[data-minutes]").forEach(button => button.addEventListener("click", () => selectTimer(button)));
   $("#timer-start").addEventListener("click", toggleTimer);
   $("#timer-reset").addEventListener("click", resetTimer);
+  $("#break-start").addEventListener("click", () => sendTimerAction("break"));
   $("#settings-btn").addEventListener("click", () => chrome.runtime.openOptionsPage());
   $("#cancel-unlock").addEventListener("click", cancelUnlock);
   $("#confirm-unlock").addEventListener("click", confirmUnlock);
@@ -482,50 +490,71 @@ function renderTasks(tasks) {
 function formatDueDate(value) { return new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
 
 function selectTimer(button) {
-  if ($("#timer-start").dataset.running === "true") return;
-  selectedMinutes = Number(button.dataset.minutes);
-  $$("[data-minutes]").forEach(item => item.classList.toggle("selected", item === button));
-  $("#timer-display").textContent = `${String(selectedMinutes).padStart(2, "0")}:00`;
+  if ($("#timer-start").dataset.running === "true" || timerBusy) return;
+  return sendTimerAction("reset", Number(button.dataset.minutes));
 }
 
-async function toggleTimer() {
-  if ($("#timer-start").dataset.running === "true") {
-    clearInterval(timerTick);
-    chrome.alarms.clear("focus-timer");
-    await chrome.storage.local.set({ timerEnd: null, timerRunning: false });
-    setTimerUI(false, "Paused. Reset or start a fresh session.");
+function toggleTimer() {
+  return sendTimerAction($("#timer-start").dataset.running === "true" ? "stop" : "start");
+}
+
+async function sendTimerAction(action, minutes) {
+  if (timerBusy) return;
+  timerBusy = true;
+  setTimerButtonsDisabled(true);
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "TIMER_ACTION", action, minutes });
+    if (!result?.ok) throw new Error(result?.error || "Could not update timer.");
+    if (result.state) renderTimer(result.state);
+  } catch (error) {
+    $("#timer-status").textContent = `${error.message} Try again.`;
+  } finally {
+    timerBusy = false;
+    setTimerButtonsDisabled(false);
+  }
+}
+
+function setTimerButtonsDisabled(busy) {
+  $("#timer-start").disabled = busy;
+  $("#timer-reset").disabled = busy;
+  const running = $("#timer-start").dataset.running === "true";
+  $("#break-start").disabled = busy || running;
+  $$("[data-minutes]").forEach(button => button.disabled = busy || running);
+}
+
+function renderTimer(state) {
+  clearInterval(timerTick);
+  selectedMinutes = [15, 25, 45].includes(state.focusMinutes) ? state.focusMinutes : 25;
+  const isBreak = state.timerMode === "break";
+  const running = state.timerRunning === true && Boolean(state.timerEnd);
+  $("#timer-heading").textContent = isBreak ? "5-MINUTE BREAK" : "FOCUS SESSION";
+  $("#timer-start").dataset.running = String(running);
+  $("#timer-start").textContent = running ? "Stop" : isBreak ? "Start break" : "Start focus";
+  $("#timer-reset").textContent = isBreak ? "Back to focus" : "Reset";
+  $("#break-start").hidden = isBreak;
+  $("#timer-status").textContent = running ? isBreak ? "Stretch, rest your eyes, and recharge." : "Stay on this one task. You’ve got this." : "Ready when you are.";
+  $$("[data-minutes]").forEach(button => button.classList.toggle("selected", !isBreak && Number(button.dataset.minutes) === selectedMinutes));
+  setTimerButtonsDisabled(timerBusy);
+  if (!running) {
+    $("#timer-display").textContent = `${String(isBreak ? 5 : selectedMinutes).padStart(2, "0")}:00`;
     return;
   }
-  const end = Date.now() + selectedMinutes * 60 * 1000;
-  chrome.alarms.create("focus-timer", { when: end });
-  await chrome.storage.local.set({ timerEnd: end, timerRunning: true });
-  beginTick(end);
-}
-
-function beginTick(end) {
-  clearInterval(timerTick);
-  setTimerUI(true, "Stay on this one task. You’ve got this.");
   const update = () => {
-    const remaining = Math.max(0, end - Date.now());
-    const minutes = Math.floor(remaining / 60000);
-    const seconds = Math.floor((remaining % 60000) / 1000);
+    const remaining = Math.max(0, Math.ceil((state.timerEnd - Date.now()) / 1000));
+    const minutes = Math.floor(remaining / 60);
+    const seconds = remaining % 60;
     $("#timer-display").textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-    if (!remaining) { clearInterval(timerTick); setTimerUI(false, "Session complete—nice work!"); }
+    if (!remaining && !timerBusy) {
+      clearInterval(timerTick);
+      sendTimerAction("sync");
+    }
   };
-  update(); timerTick = setInterval(update, 1000);
+  timerTick = setInterval(update, 1000);
+  update();
 }
 
-async function resetTimer() {
-  clearInterval(timerTick); chrome.alarms.clear("focus-timer");
-  await chrome.storage.local.set({ timerEnd: null, timerRunning: false });
-  $("#timer-display").textContent = `${String(selectedMinutes).padStart(2, "0")}:00`;
-  setTimerUI(false, "Ready when you are.");
-}
-
-function setTimerUI(running, status) {
-  $("#timer-start").dataset.running = String(running);
-  $("#timer-start").textContent = running ? "Pause" : "Start focus";
-  $("#timer-status").textContent = status;
+function resetTimer() {
+  return sendTimerAction("reset");
 }
 
 function debounce(fn, wait) { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), wait); }; }

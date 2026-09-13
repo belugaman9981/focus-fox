@@ -12,6 +12,8 @@ A Chrome Manifest V3 extension that blocks distracting social sites and connects
 - Homework completion counter and progress bar
 - Copy or clear quick notes, with Undo clear available even after reopening the popup (until you type new notes)
 - Reopens your last-used Helper, Tasks, or Timer tab; completed snips open in Helper
+- Automatic five-minute breaks after focus sessions, with a manual break button and completion notifications even when the popup is closed
+- Saved dark mode for the popup, settings, and blocked page
 - Friendly blocked page instead of a browser error
 - AI explanations, hints, full solutions, and answer checking for Math, Science, English, History, and other subjects
 - Optional current-page analysis using selected text, visible page text, and a screenshot of the visible tab
@@ -39,6 +41,12 @@ To change the blocked sites, open the extension and click **Edit blocked sites**
 To enable ad blocking, open **Settings & API key**, turn on **Block ads** under **Ad blocker**, and click **Save changes**. Reload open pages afterward. It is off by default and stays enabled even when social blocking is paused or outside scheduled hours. Uncheck it and save to turn it off if a site stops working.
 
 The ad blocker uses a small built-in domain list in `rules/ads.json`; it does not download filter lists. It blocks ad network requests, but does not remove empty ad spaces or guarantee blocking of all ads, especially ads served by the site itself or video ads. Rules use Chrome's [declarativeNetRequest API](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest).
+
+## Breaks and appearance
+
+Open **Timer** and start a focus session. When it finishes, a five-minute break starts automatically. You can also choose **Take a 5-minute break** while the timer is idle. **Back to focus** ends the break early; **Stop** cancels the current countdown. Breaks do not add to your study streak or change your site-blocking settings. After a break, start the next focus session when ready.
+
+Turn on **Dark mode** in the popup or under **Appearance** in Settings. It saves immediately and updates other open FocusFox pages.
 
 ## Connect DeepSeek
 

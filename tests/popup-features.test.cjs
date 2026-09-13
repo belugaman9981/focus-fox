@@ -27,13 +27,13 @@ function popup(data = {}) {
   };
   let failStorage = false, failRules = false, copied;
   const chrome = {
-    storage: { local: {
+    storage: { onChanged: { addListener() {} }, local: {
       async get(keys) { return Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map(key => [key, data[key]])); },
       async set(values) { if (failStorage) throw new Error("Storage failed"); Object.assign(data, values); }
     } },
     runtime: { async sendMessage() { const ok = !failRules; failRules = false; return { ok }; } }
   };
-  const context = vm.createContext({ document, chrome, navigator: { clipboard: { async writeText(value) { copied = value; } } } });
+  const context = vm.createContext({ document, chrome, clearInterval() {}, setInterval() {}, navigator: { clipboard: { async writeText(value) { copied = value; } } } });
   vm.runInContext(source, context);
   return { data, nodes, run: code => vm.runInContext(code, context), failStorage: value => { failStorage = value; },
     failRules: () => { failRules = true; }, copied: () => copied };
