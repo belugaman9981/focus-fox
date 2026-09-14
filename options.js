@@ -35,7 +35,7 @@ async function save() {
     await chrome.storage.local.set({ blockedSites, deepseekApiKey: apiKey.value.trim(), deepseekModel: model.value, scheduleEnabled: scheduleEnabled.checked, scheduleStart: scheduleStart.value, scheduleEnd: scheduleEnd.value, adBlockingEnabled: adBlockingEnabled.checked });
     const result = await chrome.runtime.sendMessage({ type: "REFRESH_RULES" });
     if (!result?.ok) throw new Error(result?.error || "Could not apply blocking rules. Try saving again.");
-    sites.value = blockedSites.join("\n"); status.textContent = "Saved! Reload open pages to apply ad blocking changes.";
+    sites.value = blockedSites.join("\n"); status.textContent = "Saved! Reload open pages to apply ad blocking changes."; 
     statusTimeout = setTimeout(() => status.textContent = "", 5000);
   } catch (error) {
     status.textContent = `Could not apply changes: ${error.message}`;
